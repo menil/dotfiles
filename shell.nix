@@ -1,13 +1,11 @@
-{ pkgs ? import <nixpkgs> {} }:
+{ pkgs ? import <nixpkgs> { } }:
 
 pkgs.mkShell {
   buildInputs = with pkgs; [
-    git
-    gh
     just
+    shellcheck
+    shfmt
+    nixpkgs-fmt
+    markdownlint-cli
   ];
-
-  shellHook = ''
-    echo "❄️ Welcome to the Project Template shell!"
-  '';
 }

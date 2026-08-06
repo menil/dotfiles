@@ -1,0 +1,18 @@
+[
+  "git diff",
+  "git status",
+  "git log",
+  "git show",
+  "ls",
+  "rg",
+  "grep",
+  "pwd",
+  "which",
+  "file",
+  "head",
+  "tail",
+  "sort",
+  "uniq",
+  "wc",
+  "cat"
+]

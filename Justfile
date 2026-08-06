@@ -1,18 +1,22 @@
-# Project Task Runner
-
-# List available recipes
-default:
-    @just --list
-
-# Format code and configuration files
-format:
-    @echo "No formatter configured yet. Customize this recipe in the Justfile!"
-
-# Run code and markdown linting checks
+# ─── Lint ───────────────────────────────────────────────────
 lint:
-    @echo "No linter configured yet. Customize this recipe in the Justfile!"
+    shellcheck bootstrap.sh .githooks/commit-msg .githooks/pre-commit
+    markdownlint .
+    nix flake check --impure
 
-# Run all local checks (tests, format checks, lints)
-validate:
-    @echo "Running project validations..."
-    just lint
+# ─── Format ─────────────────────────────────────────────────
+format:
+    nixpkgs-fmt *.nix modules/*.nix lib/*.nix
+    shfmt -w -i 2 -sr bootstrap.sh .githooks/commit-msg .githooks/pre-commit
+    shfmt -w -i 2 -sr -ln=zsh src/home/.zshrc
+    markdownlint --fix .
+
+# ─── Check Format ───────────────────────────────────────────
+check-format:
+    nixpkgs-fmt --check *.nix modules/*.nix lib/*.nix
+    shfmt -d -i 2 -sr bootstrap.sh .githooks/commit-msg .githooks/pre-commit
+    shfmt -d -i 2 -sr -ln=zsh src/home/.zshrc
+    markdownlint .
+
+# ─── Validate (lint + check format) ─────────────────────────
+validate: lint check-format
