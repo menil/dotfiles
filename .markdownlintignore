@@ -1,0 +1,8 @@
+.git/
+.gemini/
+.devenv/
+.direnv/
+node_modules/
+result/
+.beads/
+src/agents/

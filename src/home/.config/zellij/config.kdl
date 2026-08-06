@@ -1,0 +1,13 @@
+// Zellij Configuration File
+// For more options, see: https://zellij.dev/documentation/
+
+theme "default"
+
+// Toggle mouse mode (enabled by default)
+mouse_mode true
+
+// Configure pane frames (visible borders around panes)
+pane_frames true
+
+// Setup a default layout
+default_layout "compact"

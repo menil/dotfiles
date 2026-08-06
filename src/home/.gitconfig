@@ -1,0 +1,39 @@
+[include]
+	path = ~/.gitconfig.local
+
+
+[core]
+	editor = nvim
+	autocrlf = input
+	pager = delta
+
+[interactive]
+	diffFilter = delta --color-only
+
+[delta]
+	navigate = true
+	light = false
+
+[merge]
+	conflictstyle = zdiff3
+
+[init]
+	defaultBranch = main
+
+[color]
+	ui = auto
+
+[diff]
+	external = difft
+
+[alias]
+	# Allow easy bypass of difftastic using git diff
+	d = diff --no-ext-diff
+	# Standard graph log (lg)
+	lg = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit --date=relative
+	# Detailed date graph log (ld)
+	ld = log --graph --pretty=format:'%C(bold blue)%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%ad) %C(bold black)<%an>%Creset' --date=short
+	# View details of the last commit
+	last = log -1 HEAD --stat
+	# Standup - show what you've done since yesterday
+	standup = !git log --since=\"yesterday\" --author=\"$(git config user.name)\" --pretty=format:'%C(yellow)%h%Creset %s'

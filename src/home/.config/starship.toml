@@ -1,0 +1,79 @@
+# Starship Configuration File
+# For more info: https://starship.rs/config
+
+# Insert a blank line between shell prompts
+add_newline = true
+
+# Timeout for commands executed by starship (in milliseconds)
+command_timeout = 500
+
+# Format layout (left prompt)
+format = """
+$directory\
+$git_branch\
+$git_status\
+$nix_shell\
+$nodejs\
+$python\
+$rust\
+$line_break\
+$character"""
+
+# Format layout (right prompt)
+right_format = """$cmd_duration"""
+
+[directory]
+style = "bold cyan"
+truncation_length = 6
+truncation_symbol = "…/"
+read_only = " 󰌾"
+home_symbol = "󱂵 ~"
+format = "[$path]($style)[$read_only]($read_only_style) "
+
+[character]
+success_symbol = "[❯](bold green)"
+error_symbol = "[❯](bold red)"
+
+[git_branch]
+symbol = " "
+style = "bold yellow"
+format = "on [$symbol$branch]($style) "
+
+[git_status]
+style = "bold red"
+format = "([\\[$all_status$ahead_behind\\]]($style) )"
+conflicted = "󰞇 "
+ahead = "⇡${count}"
+behind = "⇣${count}"
+diverged = "⇕⇡${ahead_count}⇣${behind_count}"
+untracked = "?${count}"
+stashed = " "
+modified = "!${count}"
+staged = "+${count}"
+renamed = "»"
+deleted = "✘"
+
+[nix_shell]
+symbol = "❄️ "
+format = "via [$symbol$state( \\($name\\))]($style) "
+style = "bold blue"
+
+[cmd_duration]
+min_time = 2000
+format = "took [$duration]($style)"
+style = "bold yellow"
+
+[nodejs]
+symbol = " "
+format = "via [$symbol($version)]($style) "
+style = "bold green"
+
+[python]
+symbol = " "
+format = "via [$symbol($version)]($style) "
+style = "bold yellow"
+
+[rust]
+symbol = " "
+format = "via [$symbol($version)]($style) "
+style = "bold red"
