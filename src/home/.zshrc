@@ -65,8 +65,8 @@ fi
 alias du="dust"
 
 # Home Manager Helper Aliases
-alias hms='home-manager switch --flake "$DOTFILES_DIR#macbook" --impure'
-alias hms-linux='home-manager switch --flake "$DOTFILES_DIR#linux-workstation" --impure'
+alias hms='bash "$DOTFILES_DIR/scripts/sync-agents.sh" && home-manager switch --flake "$DOTFILES_DIR#macbook" --impure'
+alias hms-linux='bash "$DOTFILES_DIR/scripts/sync-agents.sh" && home-manager switch --flake "$DOTFILES_DIR#linux-workstation" --impure'
 
 # Set up interactive prompt
 if command -v starship &> /dev/null; then
