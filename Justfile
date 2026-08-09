@@ -20,3 +20,8 @@ check-format:
 
 # ─── Validate (lint + check format) ─────────────────────────
 validate: lint check-format
+
+# ─── Agents ─────────────────────────────────────────────────
+# Sync the src/agents submodule pointer to the latest agent-config commit
+sync-agents:
+    ./scripts/sync-agents.sh

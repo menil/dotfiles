@@ -1,3 +1,4 @@
 [submodule "src/agents"]
 	path = src/agents
 	url = git@github.com:menil/agent-config.git
+	branch = main
