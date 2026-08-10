@@ -6,6 +6,7 @@ pkgs.mkShell {
     shellcheck
     shfmt
     nixpkgs-fmt
+    statix
     markdownlint-cli
   ];
 }
