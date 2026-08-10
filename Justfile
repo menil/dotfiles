@@ -2,6 +2,7 @@
 lint:
     shellcheck bootstrap.sh .githooks/commit-msg .githooks/pre-commit
     markdownlint .
+    statix check .
     nix flake check --impure
 
 # ─── Format ─────────────────────────────────────────────────

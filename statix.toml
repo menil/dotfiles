@@ -1,0 +1,5 @@
+# Statix configuration
+# W20 (repeated_keys): home-manager modules declare their own `home.*`
+# options (e.g. `home.packages`, `home.file`) at the top level. The flat
+# style is idiomatic here, so the nested-attrset warning is disabled.
+disabled = ["repeated_keys"]
