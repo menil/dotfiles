@@ -98,17 +98,45 @@ let
       (builtins.readDir skillsDir)
   );
 
+  # Skills marked "disable-model-invocation: true" in their frontmatter are meant
+  # to be triggered explicitly via slash command only. OpenCode ignores that flag:
+  # it would advertise them as auto-loadable skills AND register them as slash
+  # commands, making argument handling (e.g. `$ARGUMENTS`) nondeterministic.
+  # Deploy those to OpenCode as commands only, not as skills.
+  #
+  # The flag is matched only inside the YAML frontmatter block so that the phrase
+  # appearing in a skill's body text cannot cause a false positive.
+  isCommandOnly = name:
+    let
+      contents = builtins.readFile (skillsDir + "/${name}/SKILL.md");
+      # `builtins.split` yields [prefix, ["---\n"], frontmatter, ["---\n"], body, ...].
+      # Fall back to "" when there is no closing fence so frontmatter-less files
+      # default to "not command-only" rather than being searched in full.
+      frontmatter =
+        let parts = builtins.split "---\n" contents;
+        in if builtins.length parts < 4 then "" else builtins.elemAt parts 2;
+    in
+    lib.hasInfix "disable-model-invocation" frontmatter;
+
+  commandOnlySkills = builtins.filter isCommandOnly skillDirs;
+
+  # Set-based membership keeps classification linear in the number of skills.
+  commandOnlySkillsSet = lib.genAttrs commandOnlySkills (name: true);
+
   # Generate Home Manager mappings for all discovered skills.
-  # This uses lib.concatMap and lib.listToAttrs for linear O(N) evaluation complexity.
   # It symlinks the entire directory recursively to allow auxiliary resources (scripts, references) to be mapped.
   skillMappings = lib.listToAttrs (lib.concatMap
     (name:
       let
         skillPath = skillsDir + "/${name}";
+        # OpenCode auto-loads skills from skills/, so command-only skills deploy
+        # as slash commands only (see isCommandOnly above).
+        opencodeSkillMapping = lib.optional (!builtins.hasAttr name commandOnlySkillsSet)
+          { name = ".config/opencode/skills/${name}"; value = { source = skillPath; }; };
       in
       [
         { name = ".claude/skills/${name}"; value = { source = skillPath; }; }
-        { name = ".config/opencode/skills/${name}"; value = { source = skillPath; }; }
+      ] ++ opencodeSkillMapping ++ [
         # OpenCode registers slash commands from flat markdown files inside the commands/ directory
         { name = ".config/opencode/commands/${name}.md"; value = { source = skillPath + "/SKILL.md"; }; }
         { name = ".gemini/config/skills/${name}"; value = { source = skillPath; }; }
