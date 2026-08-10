@@ -3,6 +3,7 @@
   home.packages = with pkgs; [
     gitFull
     git-filter-repo
+    gh-stack
     lazygit
     delta
     difftastic
