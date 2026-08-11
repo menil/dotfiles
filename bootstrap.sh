@@ -49,10 +49,15 @@ else
   echo -e "Nix package manager is ${GREEN}installed${NC}."
 fi
 
-# 3. Configure Git hooks path (only if inside a Git repository)
+# 3. Configure Git hooks and submodules (only if inside a Git repository)
 if git rev-parse --is-inside-work-tree &> /dev/null; then
   echo -e "Configuring git hooks path..."
   git config core.hooksPath .githooks
+
+  echo -e "Initializing git submodules..."
+  if ! err=$(git submodule update --init --recursive 2>&1); then
+    echo -e "${RED}Warning: Failed to initialize private submodules: ${err}. Using public agent configuration defaults.${NC}"
+  fi
 fi
 
 # 4. Configure local Git user details if not present
