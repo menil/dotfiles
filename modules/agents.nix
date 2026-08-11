@@ -107,28 +107,111 @@ let
   # The flag is matched only inside the YAML frontmatter block so that the phrase
   # appearing in a skill's body text cannot cause a false positive.
   isCommandOnly = name:
-    let
-      contents = builtins.readFile (skillsDir + "/${name}/SKILL.md");
-      # `builtins.split` yields [prefix, ["---\n"], frontmatter, ["---\n"], body, ...].
-      # Fall back to "" when there is no closing fence so frontmatter-less files
-      # default to "not command-only" rather than being searched in full.
-      frontmatter =
-        let parts = builtins.split "---\n" contents;
-        in if builtins.length parts < 4 then "" else builtins.elemAt parts 2;
-    in
-    lib.hasInfix "disable-model-invocation" frontmatter;
+    if skillsDir == null then false
+    else
+      let
+        contents = builtins.readFile (skillsDir + "/${name}/SKILL.md");
+        # `builtins.split` yields [prefix, ["---\n"], frontmatter, ["---\n"], body, ...].
+        # Fall back to "" when there is no closing fence so frontmatter-less files
+        # default to "not command-only" rather than being searched in full.
+        frontmatter =
+          let parts = builtins.split "---\n" contents;
+          in if builtins.length parts < 4 then "" else builtins.elemAt parts 2;
+      in
+      lib.hasInfix "disable-model-invocation" frontmatter;
 
   commandOnlySkills = builtins.filter isCommandOnly skillDirs;
 
   # Set-based membership keeps classification linear in the number of skills.
   commandOnlySkillsSet = lib.genAttrs commandOnlySkills (name: true);
 
+  # Locates the shared subagents definition file.
+  # Note: The 'self-review' skill coordinates the same panel of subagents defined in the
+  # 'review' skill, so both draw from the review/subagents.md configuration to avoid duplication.
+  subagentsPath = if skillsDir != null then skillsDir + "/review/subagents.md" else null;
+  hasSubagents = subagentsPath != null && builtins.pathExists subagentsPath;
+  subagentsContent = if hasSubagents then builtins.readFile subagentsPath else "";
+
+  # Inline subagents.md contents into SKILL.md for review-related skills.
+  # This pre-processing is necessary because agent platforms (like Claude Code, OpenCode,
+  # and Gemini) only parse and load the main SKILL.md file, ignoring relative links to
+  # external markdown documents when preparing the system prompt context.
+  # Replaces a block of text enclosed by startMarker and endMarker with replacement
+  replaceBlock = startMarker: endMarker: replacement: contents:
+    let
+      parts = lib.splitString startMarker contents;
+    in
+    if builtins.length parts < 2 then contents
+    else
+      let
+        prefix = builtins.elemAt parts 0;
+        rest = lib.splitString endMarker (builtins.elemAt parts 1);
+      in
+      if builtins.length rest < 2 then contents
+      else
+        let
+          suffix = lib.concatStringsSep endMarker (builtins.tail rest);
+        in
+        "${prefix}${replacement}${suffix}";
+
+  # Inline subagents.md contents into SKILL.md for review-related skills.
+  # This pre-processing is necessary because agent platforms (like Claude Code, OpenCode,
+  # and Gemini) only parse and load the main SKILL.md file, ignoring relative links to
+  # external markdown documents when preparing the system prompt context.
+  inlineSubagents = name: contents:
+    if (name == "review" || name == "self-review") && hasSubagents then
+      let
+        replacement = ''
+          The subagent prompt descriptions, synthesis logic, output formatting rules, and strict validation restrictions (including the command execution ban) are defined below.
+
+          - **In Antigravity**: Use the `invoke_subagent` tool to spawn 8 separate review subagents concurrently, one for each pass defined below.
+          - **In Claude Code / OpenCode**: Emulate parallel execution by performing 8 distinct independent passes over the diff using the prompt definitions defined below and merge their results into the final summary matching the output format specified below.
+        '';
+        inlined = replaceBlock "<!-- SUBAGENTS_START -->\n" "<!-- SUBAGENTS_END -->" replacement contents;
+      in
+      "${inlined}\n\n${subagentsContent}"
+    else
+      contents;
+
+  # Resolves the skill source path.
+  # For 'review' and 'self-review' skills, we compile a new directory with the inlined SKILL.md.
+  # For other skills, we symlink the original source directory directly.
+  skillSource = name:
+    if skillsDir == null then null
+    else
+      let
+        originalSkillDir = skillsDir + "/${name}";
+      in
+      if (name == "review" || name == "self-review") && hasSubagents then
+        let
+          originalSkillMd = builtins.readFile (originalSkillDir + "/SKILL.md");
+          modifiedSkillMd = inlineSubagents name originalSkillMd;
+        in
+        pkgs.runCommand "skill-${name}"
+          {
+            inherit modifiedSkillMd;
+            passAsFile = [ "modifiedSkillMd" ];
+          } ''
+          mkdir -p "$out"
+          cp -rf "${originalSkillDir}/." "$out/"
+          rm -f "$out/SKILL.md" "$out/subagents.md"
+          cp -f "$modifiedSkillMdPath" "$out/SKILL.md"
+
+          # Assert that all subagents.md references were successfully inlined and replaced
+          if grep -Ei "subagents\.md" "$out/SKILL.md"; then
+            echo "Error: Found unresolved subagents.md references in inlined SKILL.md for skill: ${name}" >&2
+            exit 1
+          fi
+        ''
+      else
+        originalSkillDir;
+
   # Generate Home Manager mappings for all discovered skills.
   # It symlinks the entire directory recursively to allow auxiliary resources (scripts, references) to be mapped.
   skillMappings = lib.listToAttrs (lib.concatMap
     (name:
       let
-        skillPath = skillsDir + "/${name}";
+        skillPath = skillSource name;
         # OpenCode auto-loads skills from skills/, so command-only skills deploy
         # as slash commands only (see isCommandOnly above).
         opencodeSkillMapping = lib.optional (!builtins.hasAttr name commandOnlySkillsSet)
