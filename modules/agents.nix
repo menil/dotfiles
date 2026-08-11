@@ -82,9 +82,29 @@ let
     permission = {
       bash = {
         "*" = "ask";
-      } // lib.listToAttrs (
-        (map (cmd: { name = cmd; value = "allow"; }) allowedCommands)
-          ++ (map (cmd: { name = "${cmd} *"; value = "allow"; }) (lib.filter isReadOnly allowedCommands))
+      } // (
+        let
+          # OpenCode does not support regular expressions in its whitelist, so filter out
+          # the regex git -C commands and replace them with standard wildcard rules.
+          opencodeBaseCommands = lib.filter (cmd: !lib.hasPrefix "git -C [" cmd) allowedCommands;
+
+          # For every read-only git command, generate its git -C wildcard variant
+          # e.g., "git diff" -> "git -C * diff *"
+          makeGitCWildcard = cmd:
+            let
+              subcmd = lib.removePrefix "git " cmd;
+              gitC = "git -C * ${subcmd} *";
+            in
+            gitC;
+
+          gitReadOnlyCommands = lib.filter (cmd: lib.hasPrefix "git " cmd && isReadOnly cmd) opencodeBaseCommands;
+          gitCWildcards = map makeGitCWildcard gitReadOnlyCommands;
+        in
+        lib.listToAttrs (
+          (map (cmd: { name = cmd; value = "allow"; }) opencodeBaseCommands)
+            ++ (map (cmd: { name = "${cmd} *"; value = "allow"; }) (lib.filter isReadOnly opencodeBaseCommands))
+            ++ (map (cmd: { name = cmd; value = "allow"; }) gitCWildcards)
+        )
       );
     };
   };
