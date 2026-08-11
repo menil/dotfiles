@@ -55,6 +55,16 @@ let
   # Check if a command starts with any read-only prefix
   isReadOnly = cmd: lib.any (prefix: lib.hasPrefix prefix cmd) readOnlyPrefixes;
 
+  # Sandbox allowed read paths for container execution
+  sandboxSettings = {
+    filesystem = {
+      allowRead = [
+        "/nix/store"
+        "/System/Volumes/Data/nix/store"
+      ];
+    };
+  };
+
   # Generate Claude Code settings
   claudeSettingsJson = builtins.toJSON {
     permissions = {
@@ -63,6 +73,7 @@ let
       defaultMode = "acceptEdits";
       allow = map (cmd: "Bash(${cmd})") allowedCommands;
     };
+    sandbox = sandboxSettings;
   };
 
   # Generate OpenCode settings
@@ -85,9 +96,9 @@ let
         "read_file(/nix/store)"
       ];
     };
-    # Configure the agent's preferred editor to align dynamically with the host's EDITOR environment
-    # variable, falling back to neovim ("nvim") if it is unset or empty.
+    # Configure preferred editor aligning with EDITOR env, falling back to nvim.
     editor = let envEditor = builtins.getEnv "EDITOR"; in if envEditor != "" then envEditor else "nvim";
+    sandbox = sandboxSettings;
   };
 
   # Dynamically discover only directories under skillsDir that contain a SKILL.md file.
