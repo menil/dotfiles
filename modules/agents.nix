@@ -5,12 +5,16 @@ let
   # the live checkout via DOTFILES_DIR (set in .zshrc) and fall back to the
   # sanitized in-repo defaults when unavailable.
   repoRoot = builtins.getEnv "DOTFILES_DIR";
+  # privateDir resolves to a string to keep live checkout symlinking.
+  # Any localized Nix store copy is performed selectively in derivations.
   privateDir = if repoRoot != "" then repoRoot + "/src/agents" else null;
   hasPrivateConfig = privateDir != null && builtins.pathExists (privateDir + "/allowed-commands.json");
 
   # Resolve paths dynamically
   allowedCommandsPath = if hasPrivateConfig then privateDir + "/allowed-commands.json" else ../src/allowed-commands.json;
-  sharedRulesPath = if hasPrivateConfig then privateDir + "/shared-rules.md" else ../src/shared-rules.md;
+  sharedRulesPath =
+    if hasPrivateConfig && builtins.pathExists (privateDir + "/shared-rules.md") then privateDir + "/shared-rules.md"
+    else ../src/shared-rules.md;
   skillsDir =
     if hasPrivateConfig && builtins.pathExists (privateDir + "/skills") then privateDir + "/skills"
     else if builtins.pathExists ../src/skills then ../src/skills
@@ -181,6 +185,9 @@ let
     else
       let
         originalSkillDir = skillsDir + "/${name}";
+        # Coerce the string path to a Nix path type so that the Nix sandboxed
+        # builder can copy the skill files from the Nix store during derivation build.
+        originalSkillPath = /. + originalSkillDir;
       in
       if (name == "review" || name == "self-review") && hasSubagents then
         let
@@ -193,7 +200,7 @@ let
             passAsFile = [ "modifiedSkillMd" ];
           } ''
           mkdir -p "$out"
-          cp -rf "${originalSkillDir}/." "$out/"
+          cp -rf "${originalSkillPath}/." "$out/"
           rm -f "$out/SKILL.md" "$out/subagents.md"
           cp -f "$modifiedSkillMdPath" "$out/SKILL.md"
 
