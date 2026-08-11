@@ -93,8 +93,8 @@ let
   antigravitySettingsJson = builtins.toJSON {
     permissions = {
       allow = map (cmd: "command(${cmd})") allowedCommands ++ [
-        "read_file(/nix/store)"
-        "read_file(/System/Volumes/Data/nix/store)"
+        "read_file(/nix/store/)"
+        "read_file(/System/Volumes/Data/nix/store/)"
       ];
     };
     # Configure preferred editor aligning with EDITOR env, falling back to nvim.
