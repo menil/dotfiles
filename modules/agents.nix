@@ -86,6 +86,14 @@ let
         (map (cmd: { name = cmd; value = "allow"; }) allowedCommands)
           ++ (map (cmd: { name = "${cmd} *"; value = "allow"; }) (lib.filter isReadOnly allowedCommands))
       );
+      # OpenCode auto-loads skills from ~/.claude/skills/ and ~/.agents/skills/ in
+      # addition to its own dirs, and it ignores Claude Code's
+      # disable-model-invocation flag. Command-only workflows would therefore be
+      # advertised to the model as auto-loadable skills AND registered as slash
+      # commands, making argument handling (e.g. $ARGUMENTS) nondeterministic.
+      # deny removes them from <available_skills> while the deployed slash
+      # commands keep working. See isCommandOnly below.
+      skill = lib.genAttrs commandOnlySkills (name: "deny");
     };
   };
 
