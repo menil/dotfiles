@@ -250,6 +250,7 @@ let
         # OpenCode registers slash commands from flat markdown files inside the commands/ directory
         { name = ".config/opencode/commands/${name}.md"; value = { source = skillPath + "/SKILL.md"; }; }
         { name = ".gemini/config/skills/${name}"; value = { source = skillPath; }; }
+        { name = ".pi/agent/skills/${name}"; value = { source = skillPath; }; }
       ]
     )
     skillDirs);
@@ -260,6 +261,7 @@ in
     ".claude/CLAUDE.md".source = sharedRulesPath;
     ".opencode/instructions.md".source = sharedRulesPath;
     ".gemini/config/AGENTS.md".source = sharedRulesPath;
+    ".pi/agent/AGENTS.md".source = sharedRulesPath;
 
     # Dynamically generated configurations from the shared allowedCommands list
     ".claude/settings.json".text = claudeSettingsJson;
