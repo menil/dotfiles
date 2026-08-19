@@ -110,6 +110,17 @@ let
     sandbox = sandboxSettings;
   };
 
+  # Generate Codex settings (TOML format).
+  # Codex uses OS-native sandboxing with permission profiles rather than a
+  # per-command allowlist.  The custom "dotfiles-dev" profile extends the
+  # built-in :workspace profile and adds /nix/store read access plus network
+  # access for gh, git push, and package manager operations.
+  #
+  # NOTE: TOML is read from a separate file rather than inlined as a Nix
+  # multi-line string because nixpkgs-fmt re-indents string content, which
+  # breaks TOML parsing (bare keys must start at column 0).
+  codexSettingsToml = builtins.readFile ../src/codex-config.toml;
+
   # Dynamically discover only directories under skillsDir that contain a SKILL.md file.
   # Path addition is used instead of string interpolation to adhere to the flake check requirements.
   # If no private or public skills directory exists, no skills are mapped.
@@ -251,6 +262,8 @@ let
         { name = ".config/opencode/commands/${name}.md"; value = { source = skillPath + "/SKILL.md"; }; }
         { name = ".gemini/config/skills/${name}"; value = { source = skillPath; }; }
         { name = ".pi/agent/skills/${name}"; value = { source = skillPath; }; }
+        # Codex uses $skill-name for invocation; deploy all skills unconditionally
+        { name = ".codex/skills/${name}"; value = { source = skillPath; }; }
       ]
     )
     skillDirs);
@@ -262,10 +275,12 @@ in
     ".opencode/instructions.md".source = sharedRulesPath;
     ".gemini/config/AGENTS.md".source = sharedRulesPath;
     ".pi/agent/AGENTS.md".source = sharedRulesPath;
+    ".codex/AGENTS.md".source = sharedRulesPath;
 
     # Dynamically generated configurations from the shared allowedCommands list
     ".claude/settings.json".text = claudeSettingsJson;
     ".config/opencode/opencode.json".text = opencodeSettingsJson;
     ".gemini/antigravity-cli/settings.json".text = antigravitySettingsJson;
+    ".codex/config.toml".text = codexSettingsToml;
   } // skillMappings;
 }
