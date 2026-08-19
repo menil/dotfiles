@@ -1,0 +1,16 @@
+default_permissions = "dotfiles-dev"
+
+[permissions.dotfiles-dev]
+description = "Development profile for dotfiles workspace"
+extends = ":workspace"
+
+[permissions.dotfiles-dev.filesystem]
+":minimal" = "read"
+"/nix/store" = "read"
+"/System/Volumes/Data/nix/store" = "read"
+
+[permissions.dotfiles-dev.filesystem.":workspace_roots"]
+"." = "write"
+
+[permissions.dotfiles-dev.network]
+enabled = true
