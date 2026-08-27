@@ -74,7 +74,10 @@ let
       allow = map (cmd: "Bash(${cmd})") allowedCommands;
     };
     sandbox = sandboxSettings;
+    # sox (required for audio capture) is installed in modules/shell.nix.
+    voiceEnabled = true;
   };
+  claudeSettingsBase = pkgs.writeText "claude-settings-base.json" claudeSettingsJson;
 
   # Generate OpenCode settings
   opencodeSettingsJson = builtins.toJSON {
@@ -277,10 +280,32 @@ in
     ".pi/agent/AGENTS.md".source = sharedRulesPath;
     ".codex/AGENTS.md".source = sharedRulesPath;
 
-    # Dynamically generated configurations from the shared allowedCommands list
-    ".claude/settings.json".text = claudeSettingsJson;
+    # Dynamically generated configurations from the shared allowedCommands list.
+    # ".claude/settings.json" is deliberately NOT deployed here (see the
+    # claudeSettingsFile activation script below) because Claude Code writes
+    # runtime state back into that file (e.g. /voice's hold/tap preference,
+    # mic-permission flag, dictation-language hints) — a home.file symlink into
+    # the read-only Nix store would make every such write fail.
     ".config/opencode/opencode.json".text = opencodeSettingsJson;
     ".gemini/antigravity-cli/settings.json".text = antigravitySettingsJson;
     ".codex/config.toml".text = codexSettingsToml;
   } // skillMappings;
+
+  # Deploy .claude/settings.json as a real writable file instead of a symlink,
+  # merging our managed keys (permissions, sandbox, voiceEnabled) on top of
+  # whatever Claude Code has already written there at runtime, so those writes
+  # survive across `home-manager switch` instead of being clobbered or, on a
+  # symlinked file, failing outright.
+  home.activation.claudeSettingsFile = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    claudeSettingsTarget="$HOME/.claude/settings.json"
+    mkdir -p "$(dirname "$claudeSettingsTarget")"
+    if [ -e "$claudeSettingsTarget" ] && [ ! -L "$claudeSettingsTarget" ]; then
+      $DRY_RUN_CMD ${pkgs.jq}/bin/jq -s '.[0] * .[1]' "$claudeSettingsTarget" ${claudeSettingsBase} > "$claudeSettingsTarget.tmp"
+      $DRY_RUN_CMD mv "$claudeSettingsTarget.tmp" "$claudeSettingsTarget"
+    else
+      $DRY_RUN_CMD rm -f "$claudeSettingsTarget"
+      $DRY_RUN_CMD cp ${claudeSettingsBase} "$claudeSettingsTarget"
+    fi
+    $DRY_RUN_CMD chmod u+w "$claudeSettingsTarget"
+  '';
 }

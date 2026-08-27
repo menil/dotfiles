@@ -34,6 +34,9 @@ in
     tealdeer
     fastfetch
 
+    # Audio capture backend required by Claude Code's /voice (dictation) mode
+    sox
+
     # Fonts
     nerd-fonts.jetbrains-mono
 
