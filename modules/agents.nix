@@ -76,6 +76,8 @@ let
     sandbox = sandboxSettings;
     # sox (required for audio capture) is installed in modules/shell.nix.
     voiceEnabled = true;
+    # Omit the "Co-Authored-By: Claude" trailer and "Generated with Claude Code" line from commits and PRs.
+    includeCoAuthoredBy = false;
   };
   claudeSettingsBase = pkgs.writeText "claude-settings-base.json" claudeSettingsJson;
 
