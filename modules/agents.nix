@@ -249,7 +249,8 @@ let
             The subagent prompt descriptions, synthesis logic, output formatting rules, and strict validation restrictions (including the command execution ban) are defined below.
 
             - **In Antigravity**: Use the `invoke_subagent` tool to spawn 8 separate review subagents concurrently, one for each pass defined below.
-            - **In Claude Code / OpenCode**: Emulate parallel execution by performing 8 distinct independent passes over the diff using the prompt definitions defined below and merge their results into the final summary matching the output format specified below.
+            - **In Claude Code**: Launch all 8 review subagents concurrently: send a single message containing 8 separate `Agent` tool calls (`subagent_type: general-purpose`), one per pass defined below. Each subagent starts with no context of its own, so give each one its persona prompt from below, the full diff text already retrieved above, and the Strict Restrictions below. Wait for all 8 to return, then synthesize their results into the final summary format below.
+            - **In OpenCode**: Launch all 8 review subagents concurrently: send a single message containing 8 separate `task` tool calls (`subagent_type: general`), one per pass defined below, with the same per-subagent contents described for Claude Code above. OpenCode currently runs batched `task` calls sequentially rather than truly in parallel (see anomalyco/opencode#14195), so this does not yet reduce wall-clock time, but still gives each pass an isolated, unbiased context instead of one narrated pass. Wait for all 8 to return, then synthesize as below.
           '';
         }
     else if name == "start-session" && hasPersonas then
