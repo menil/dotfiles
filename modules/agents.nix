@@ -197,12 +197,27 @@ let
         in
         "${prefix}${replacement}${suffix}";
 
+  # Replaces a <!-- ${markerName}_START/END --> block in `contents` with
+  # `pointerText`, then appends `externalContent` below it. Shared by
+  # buildInlinedSkill (spliced into a skill's SKILL.md) and sharedRulesResolved
+  # (spliced into shared-rules.md), the two places this splice-and-append
+  # pattern is needed. Throws if the markers aren't found: a base document
+  # with no markers has nothing to splice the external content into, which
+  # would otherwise ship a dangling "see ${externalFileName}" pointer with no
+  # content behind it.
+  spliceMarkerBlock = { markerName, externalFileName, externalContent, pointerText, contents, contextLabel }:
+    let
+      inlined = replaceBlock "<!-- ${markerName}_START -->\n" "<!-- ${markerName}_END -->" pointerText contents;
+    in
+    if inlined == contents then
+      throw "${contextLabel}: expected <!-- ${markerName}_START/END --> markers for inlining ${externalFileName}, but none were found"
+    else
+      "${inlined}\n\n${externalContent}";
+
   # Splices an external markdown file's contents into a skill's SKILL.md at build
-  # time: replaces a <!-- ${markerName}_START/END --> block with a short pointer
-  # and appends the external file's full contents below it. This is necessary
-  # because agent platforms (like Claude Code, OpenCode, and Gemini) only parse
-  # and load the main SKILL.md file, ignoring relative links to external markdown
-  # documents when preparing the system prompt context.
+  # time. This is necessary because agent platforms (like Claude Code, OpenCode,
+  # and Gemini) only parse and load the main SKILL.md file, ignoring relative
+  # links to external markdown documents when preparing the system prompt context.
   buildInlinedSkill = { name, markerName, externalFileName, externalContent, pointerText }:
     let
       originalSkillDir = skillsDir + "/${name}";
@@ -210,10 +225,13 @@ let
       # builder can copy the skill files from the Nix store during derivation build.
       originalSkillPath = /. + originalSkillDir;
       originalSkillMd = builtins.readFile (originalSkillDir + "/SKILL.md");
-      inlined = replaceBlock "<!-- ${markerName}_START -->\n" "<!-- ${markerName}_END -->" pointerText originalSkillMd;
-      modifiedSkillMd = "${inlined}\n\n${externalContent}";
-      # Escape "." for use in the grep -E pattern below (e.g. "subagents.md" -> "subagents\.md").
-      grepPattern = lib.replaceStrings [ "." ] [ "\\." ] externalFileName;
+      modifiedSkillMd = spliceMarkerBlock {
+        inherit markerName externalFileName externalContent pointerText;
+        contents = originalSkillMd;
+        contextLabel = "skill ${name}";
+      };
+      # Escape regex metacharacters for use in the grep -E pattern below (e.g. "subagents.md" -> "subagents\.md").
+      grepPattern = lib.escapeRegex externalFileName;
     in
     pkgs.runCommand "skill-${name}"
       {
@@ -288,20 +306,21 @@ let
       ]
     )
     skillDirs);
-  # Splices personas.md into shared-rules.md the same way buildInlinedSkill does
-  # for skills, since shared-rules.md is deployed as a single file rather than a
-  # skill directory (see buildInlinedSkill's comment for why this is necessary).
+  # Splices personas.md into shared-rules.md via spliceMarkerBlock, since
+  # shared-rules.md is deployed as a single file rather than a skill directory
+  # (see buildInlinedSkill's comment for why this splicing is necessary at all).
   sharedRulesRaw = builtins.readFile sharedRulesPath;
   sharedRulesResolved =
     if hasPersonas then
-      let
-        pointerText = "The full spec/plan/code/review persona definitions are below.";
-        inlined = replaceBlock "<!-- PERSONAS_START -->\n" "<!-- PERSONAS_END -->" pointerText sharedRulesRaw;
-      in
-      if inlined == sharedRulesRaw then
-        throw "shared-rules.md: expected <!-- PERSONAS_START/END --> markers for inlining personas.md, but none were found"
-      else
-        "${inlined}\n\n${personasContent}"
+      spliceMarkerBlock
+        {
+          markerName = "PERSONAS";
+          externalFileName = "personas.md";
+          externalContent = personasContent;
+          pointerText = "The full spec/plan/code/review persona definitions are below.";
+          contents = sharedRulesRaw;
+          contextLabel = "shared-rules.md";
+        }
     else
       sharedRulesRaw;
   sharedRulesFile = pkgs.writeText "shared-rules.md" sharedRulesResolved;
