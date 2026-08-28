@@ -172,11 +172,14 @@ let
   hasSubagents = subagentsPath != null && builtins.pathExists subagentsPath;
   subagentsContent = if hasSubagents then builtins.readFile subagentsPath else "";
 
-  # Inline subagents.md contents into SKILL.md for review-related skills.
-  # This pre-processing is necessary because agent platforms (like Claude Code, OpenCode,
-  # and Gemini) only parse and load the main SKILL.md file, ignoring relative links to
-  # external markdown documents when preparing the system prompt context.
-  # Replaces a block of text enclosed by startMarker and endMarker with replacement
+  # Locates the shared persona definitions file. shared-rules.md and the
+  # start-session skill both describe the same spec/plan/code/review personas,
+  # so both draw from personas.md to avoid duplication (and drift between copies).
+  personasPath = if hasPrivateConfig then privateDir + "/personas.md" else null;
+  hasPersonas = personasPath != null && builtins.pathExists personasPath;
+  personasContent = if hasPersonas then builtins.readFile personasPath else "";
+
+  # Replaces a block of text enclosed by startMarker and endMarker with replacement.
   replaceBlock = startMarker: endMarker: replacement: contents:
     let
       parts = lib.splitString startMarker contents;
@@ -194,60 +197,72 @@ let
         in
         "${prefix}${replacement}${suffix}";
 
-  # Inline subagents.md contents into SKILL.md for review-related skills.
-  # This pre-processing is necessary because agent platforms (like Claude Code, OpenCode,
-  # and Gemini) only parse and load the main SKILL.md file, ignoring relative links to
-  # external markdown documents when preparing the system prompt context.
-  inlineSubagents = name: contents:
-    if (name == "review" || name == "self-review") && hasSubagents then
-      let
-        replacement = ''
-          The subagent prompt descriptions, synthesis logic, output formatting rules, and strict validation restrictions (including the command execution ban) are defined below.
+  # Splices an external markdown file's contents into a skill's SKILL.md at build
+  # time: replaces a <!-- ${markerName}_START/END --> block with a short pointer
+  # and appends the external file's full contents below it. This is necessary
+  # because agent platforms (like Claude Code, OpenCode, and Gemini) only parse
+  # and load the main SKILL.md file, ignoring relative links to external markdown
+  # documents when preparing the system prompt context.
+  buildInlinedSkill = { name, markerName, externalFileName, externalContent, pointerText }:
+    let
+      originalSkillDir = skillsDir + "/${name}";
+      # Coerce the string path to a Nix path type so that the Nix sandboxed
+      # builder can copy the skill files from the Nix store during derivation build.
+      originalSkillPath = /. + originalSkillDir;
+      originalSkillMd = builtins.readFile (originalSkillDir + "/SKILL.md");
+      inlined = replaceBlock "<!-- ${markerName}_START -->\n" "<!-- ${markerName}_END -->" pointerText originalSkillMd;
+      modifiedSkillMd = "${inlined}\n\n${externalContent}";
+      # Escape "." for use in the grep -E pattern below (e.g. "subagents.md" -> "subagents\.md").
+      grepPattern = lib.replaceStrings [ "." ] [ "\\." ] externalFileName;
+    in
+    pkgs.runCommand "skill-${name}"
+      {
+        inherit modifiedSkillMd;
+        passAsFile = [ "modifiedSkillMd" ];
+      } ''
+      mkdir -p "$out"
+      cp -rf "${originalSkillPath}/." "$out/"
+      rm -f "$out/SKILL.md" "$out/${externalFileName}"
+      cp -f "$modifiedSkillMdPath" "$out/SKILL.md"
 
-          - **In Antigravity**: Use the `invoke_subagent` tool to spawn 8 separate review subagents concurrently, one for each pass defined below.
-          - **In Claude Code / OpenCode**: Emulate parallel execution by performing 8 distinct independent passes over the diff using the prompt definitions defined below and merge their results into the final summary matching the output format specified below.
-        '';
-        inlined = replaceBlock "<!-- SUBAGENTS_START -->\n" "<!-- SUBAGENTS_END -->" replacement contents;
-      in
-      "${inlined}\n\n${subagentsContent}"
-    else
-      contents;
+      # Assert that all ${externalFileName} references were successfully inlined and replaced
+      if grep -Ei "${grepPattern}" "$out/SKILL.md"; then
+        echo "Error: Found unresolved ${externalFileName} references in inlined SKILL.md for skill: ${name}" >&2
+        exit 1
+      fi
+    '';
 
   # Resolves the skill source path.
-  # For 'review' and 'self-review' skills, we compile a new directory with the inlined SKILL.md.
+  # For skills with external content to inline ('review'/'self-review' <- subagents.md,
+  # 'start-session' <- personas.md), we compile a new directory with the inlined SKILL.md.
   # For other skills, we symlink the original source directory directly.
   skillSource = name:
     if skillsDir == null then null
-    else
-      let
-        originalSkillDir = skillsDir + "/${name}";
-        # Coerce the string path to a Nix path type so that the Nix sandboxed
-        # builder can copy the skill files from the Nix store during derivation build.
-        originalSkillPath = /. + originalSkillDir;
-      in
-      if (name == "review" || name == "self-review") && hasSubagents then
-        let
-          originalSkillMd = builtins.readFile (originalSkillDir + "/SKILL.md");
-          modifiedSkillMd = inlineSubagents name originalSkillMd;
-        in
-        pkgs.runCommand "skill-${name}"
-          {
-            inherit modifiedSkillMd;
-            passAsFile = [ "modifiedSkillMd" ];
-          } ''
-          mkdir -p "$out"
-          cp -rf "${originalSkillPath}/." "$out/"
-          rm -f "$out/SKILL.md" "$out/subagents.md"
-          cp -f "$modifiedSkillMdPath" "$out/SKILL.md"
+    else if (name == "review" || name == "self-review") && hasSubagents then
+      buildInlinedSkill
+        {
+          inherit name;
+          markerName = "SUBAGENTS";
+          externalFileName = "subagents.md";
+          externalContent = subagentsContent;
+          pointerText = ''
+            The subagent prompt descriptions, synthesis logic, output formatting rules, and strict validation restrictions (including the command execution ban) are defined below.
 
-          # Assert that all subagents.md references were successfully inlined and replaced
-          if grep -Ei "subagents\.md" "$out/SKILL.md"; then
-            echo "Error: Found unresolved subagents.md references in inlined SKILL.md for skill: ${name}" >&2
-            exit 1
-          fi
-        ''
-      else
-        originalSkillDir;
+            - **In Antigravity**: Use the `invoke_subagent` tool to spawn 8 separate review subagents concurrently, one for each pass defined below.
+            - **In Claude Code / OpenCode**: Emulate parallel execution by performing 8 distinct independent passes over the diff using the prompt definitions defined below and merge their results into the final summary matching the output format specified below.
+          '';
+        }
+    else if name == "start-session" && hasPersonas then
+      buildInlinedSkill
+        {
+          inherit name;
+          markerName = "PERSONAS";
+          externalFileName = "personas.md";
+          externalContent = personasContent;
+          pointerText = "The full spec/plan/code/review persona definitions are below.";
+        }
+    else
+      skillsDir + "/${name}";
 
   # Generate Home Manager mappings for all discovered skills.
   # It symlinks the entire directory recursively to allow auxiliary resources (scripts, references) to be mapped.
@@ -272,15 +287,32 @@ let
       ]
     )
     skillDirs);
+  # Splices personas.md into shared-rules.md the same way buildInlinedSkill does
+  # for skills, since shared-rules.md is deployed as a single file rather than a
+  # skill directory (see buildInlinedSkill's comment for why this is necessary).
+  sharedRulesRaw = builtins.readFile sharedRulesPath;
+  sharedRulesResolved =
+    if hasPersonas then
+      let
+        pointerText = "The full spec/plan/code/review persona definitions are below.";
+        inlined = replaceBlock "<!-- PERSONAS_START -->\n" "<!-- PERSONAS_END -->" pointerText sharedRulesRaw;
+      in
+      if inlined == sharedRulesRaw then
+        throw "shared-rules.md: expected <!-- PERSONAS_START/END --> markers for inlining personas.md, but none were found"
+      else
+        "${inlined}\n\n${personasContent}"
+    else
+      sharedRulesRaw;
+  sharedRulesFile = pkgs.writeText "shared-rules.md" sharedRulesResolved;
 in
 {
   home.file = {
     # Symlink the shared rules file to all your AI agents
-    ".claude/CLAUDE.md".source = sharedRulesPath;
-    ".opencode/instructions.md".source = sharedRulesPath;
-    ".gemini/config/AGENTS.md".source = sharedRulesPath;
-    ".pi/agent/AGENTS.md".source = sharedRulesPath;
-    ".codex/AGENTS.md".source = sharedRulesPath;
+    ".claude/CLAUDE.md".source = sharedRulesFile;
+    ".opencode/instructions.md".source = sharedRulesFile;
+    ".gemini/config/AGENTS.md".source = sharedRulesFile;
+    ".pi/agent/AGENTS.md".source = sharedRulesFile;
+    ".codex/AGENTS.md".source = sharedRulesFile;
 
     # Dynamically generated configurations from the shared allowedCommands list.
     # ".claude/settings.json" is deliberately NOT deployed here (see the
