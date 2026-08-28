@@ -39,10 +39,28 @@
           echo "Font path resolved: ${fontDir}"
           touch $out
         '';
+      # Builds every generated agent-instruction file and skill directory from
+      # modules/agents.nix (not the full home-manager activation, which pulls in
+      # the whole package set). This is the only thing that actually exercises
+      # buildInlinedSkill's marker-splicing and its "unresolved reference"
+      # assertion, so a broken PERSONAS_START/END or SUBAGENTS_START/END marker
+      # fails `nix flake check` instead of only surfacing on a live
+      # `home-manager switch`.
+      agentSkillsCheck = system:
+        let
+          pkgs = import nixpkgs { inherit system; };
+          inherit (pkgs) lib;
+          agents = import ./modules/agents.nix { inherit pkgs lib; config = { }; };
+          sourcedFiles = lib.filterAttrs (_: v: v ? source) agents.home.file;
+        in
+        pkgs.linkFarm "agent-skills-check" (
+          lib.mapAttrsToList (name: v: { inherit name; path = v.source; }) sourcedFiles
+        );
     in
     {
       checks = forAllSystems (system: {
         font-path = fontPathCheck system;
+        agent-skills = agentSkillsCheck system;
       });
 
       homeConfigurations = {
