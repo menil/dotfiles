@@ -36,3 +36,7 @@ pr.diff
 
 # Beads (issue tracking)
 .beads/
+
+# Beads / Dolt files (added by bd init)
+*.gate.lock*
+
