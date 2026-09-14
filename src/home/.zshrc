@@ -20,10 +20,10 @@ export EZA_COLORS="$LS_COLORS"
 
 # Enable colors and syntax highlighting for ls (using eza if available)
 if command -v eza &> /dev/null; then
-  alias ls="eza --color=always --icons -F"
-  alias ll="eza -lah --icons"
-  alias la="eza -a --icons"
-  alias l="eza -F --icons"
+  alias ls="eza --color=always --icons=always --classify=always"
+  alias ll="eza -lah --icons=always"
+  alias la="eza -a --icons=always"
+  alias l="eza --classify=always --icons=always"
 else
   # Fallback to standard ls colors
   if [ "$(uname)" = "Darwin" ]; then
