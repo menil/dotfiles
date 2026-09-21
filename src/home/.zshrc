@@ -14,6 +14,19 @@ if [ -e '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh' ]; then
   . '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
 fi
 
+# Nix & Home Manager completion path
+for fpath_dir in \
+  "$HOME/.nix-profile/share/zsh/site-functions" \
+  "/nix/var/nix/profiles/default/share/zsh/site-functions" \
+  "/opt/homebrew/share/zsh/site-functions"; do
+  if [ -d "$fpath_dir" ]; then
+    fpath=("$fpath_dir" $fpath)
+  fi
+done
+
+# Initialize Zsh completion system
+autoload -Uz compinit && compinit
+
 # Retro DOS / 1dir+ Color Scheme
 export LS_COLORS="di=1;33:ex=1;32:ln=1;36:*.txt=1;38;5;231:*.md=1;38;5;231:*.pdf=1;38;5;231:*.doc=1;38;5;231:*.docx=1;38;5;231:*.rtf=1;38;5;231:*.odt=1;38;5;231:*.epub=1;38;5;231:*.py=1;36:*.js=1;36:*.ts=1;36:*.nix=1;36:*.rs=1;36:*.go=1;36:*.c=1;36:*.cpp=1;36:*.h=1;36:*.json=1;36:*.xml=1;36:*.png=1;35:*.jpg=1;35:*.jpeg=1;35:*.gif=1;35:*.svg=1;35:*.bmp=1;35:*.mp3=1;35:*.mp4=1;35:*.wav=1;35:*.mov=1;35:*.mkv=1;35:*.zip=1;31:*.tar=1;31:*.gz=1;31:*.tgz=1;31:*.rar=1;31:*.7z=1;31:*.bz2=1;31:*.conf=1;30:*.ini=1;30:*.yaml=1;30:*.yml=1;30:*.env=1;30:*.plist=1;30"
 export EZA_COLORS="$LS_COLORS"
