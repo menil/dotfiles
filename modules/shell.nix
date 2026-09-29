@@ -22,6 +22,7 @@ in
     # Syntax highlighting and colorized utilities
     eza
     bat
+    bat-extras.batpipe
     sourceHighlight
     zsh-syntax-highlighting
     fzf

@@ -88,8 +88,12 @@ else
   PROMPT='%F{cyan}%n%f@%F{blue}%m%f %F{green}%~%f %# '
 fi
 
-# Syntax highlighting for less and cat using bat (falls back to source-highlight)
-if command -v bat &> /dev/null; then
+# Syntax highlighting and archive preprocessing for less and cat using bat/batpipe
+if command -v batpipe &> /dev/null; then
+  eval "$(batpipe)"
+  alias cat="bat"
+  export LESS="-R"
+elif command -v bat &> /dev/null; then
   alias cat="bat"
   export LESSOPEN="| bat --color=always --style=plain %s"
   export LESS="-R"
@@ -97,6 +101,15 @@ elif command -v src-hilite-lesspipe.sh &> /dev/null; then
   export LESSOPEN="| src-hilite-lesspipe.sh %s"
   export LESS="-R"
 fi
+
+# Route JSON files to jless when paging interactively
+less() {
+  if [[ $# -eq 1 && "$1" == *.json && -f "$1" && -t 1 && -t 0 ]] && command -v jless &> /dev/null; then
+    jless "$@"
+  else
+    command less "$@"
+  fi
+}
 
 # Colorized man pages in less
 export LESS_TERMCAP_mb=$'\E[1;31m'
