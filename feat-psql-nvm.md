@@ -3,11 +3,11 @@
 ## Context & Goal
 
 The shell environment needed `psql` (PostgreSQL client) and `nvm` for
-switching Node versions per project. The dotfiles are managed
-declaratively with Home Manager, so both should be reproducible rather
-than installed by hand. `nvm` is not packaged in nixpkgs or Home
-Manager, and its install scripts expect to write Node versions into
-`NVM_DIR`, which cannot live in the read-only Nix store.
+switching Node versions. The dotfiles are managed declaratively with
+Home Manager, so both should be reproducible rather than installed by
+hand. `nvm` is not packaged in nixpkgs or Home Manager, and its scripts
+expect to write Node versions into `NVM_DIR`, which cannot live in the
+read-only Nix store.
 
 ## Architecture & Key Decisions
 
@@ -29,10 +29,9 @@ Manager, and its install scripts expect to write Node versions into
 
 - **Upstream `curl | bash` installer**: not reproducible, mutates
   dotfiles on its own, and bypasses the declarative setup.
-- **Using `NVM_DIR` pointing straight at the Nix store path**: the
-  store is read-only, so `nvm install` would fail.
-- **Alternative version managers (fnm, volta, asdf, mise)**: packaged
-  in nixpkgs, but nvm was explicitly wanted for compatibility with
-  existing `.nvmrc` workflows and team habits.
+- **Pointing `NVM_DIR` straight at the Nix store path**: the store is
+  read-only, so `nvm install` would fail.
 - **Relying only on the Nix-provided `nodejs`**: already present, but
-  it cannot switch versions per project.
+  it is a single fixed version and cannot be switched per project.
+- **Other version managers packaged in nixpkgs (fnm, volta, mise)**:
+  not evaluated in depth; nvm was the tool requested for this change.
