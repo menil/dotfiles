@@ -9,6 +9,14 @@ let
   fontFamily = builtins.head fontFamilyDirs;
   fontDir = "${fontFamilyDir}/${fontFamily}";
   font = "JetBrainsMono";
+
+  # nvm is not packaged in nixpkgs or Home Manager, so pin the upstream release.
+  nvmSrc = pkgs.fetchFromGitHub {
+    owner = "nvm-sh";
+    repo = "nvm";
+    rev = "v0.40.8";
+    hash = "sha256-24FP1brAAyWu+Q0Dk+Y4aXgdCBon9GkBXgFaGXBO7sc=";
+  };
 in
 {
   home.packages = with pkgs; [
@@ -43,6 +51,7 @@ in
 
     # Development languages and tools
     nodejs
+    postgresql # provides psql
     direnv
     nix-direnv
     beads.packages.${pkgs.system}.default
@@ -55,7 +64,12 @@ in
   ]);
 
   # Platform-specific configurations
-  home.file = lib.optionalAttrs pkgs.stdenv.isDarwin {
+  home.file = {
+    # Stable symlink to the pinned nvm scripts. They live in the read-only Nix
+    # store, so installed Node versions go in a separate writable NVM_DIR
+    # (~/.nvm, set in .zshrc).
+    ".local/share/nvm-sh".source = nvmSrc;
+  } // lib.optionalAttrs pkgs.stdenv.isDarwin {
     "Library/Fonts/JetBrainsMono" = {
       source = "${fontDir}/${font}";
       recursive = true;

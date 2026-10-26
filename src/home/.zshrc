@@ -148,6 +148,14 @@ for suggestions_path in "$HOME/.nix-profile/share/zsh-autosuggestions/zsh-autosu
   fi
 done
 
+# nvm: scripts are pinned by Home Manager (read-only), Node versions install into ~/.nvm
+export NVM_DIR="$HOME/.nvm"
+mkdir -p "$NVM_DIR"
+if [ -s "$HOME/.local/share/nvm-sh/nvm.sh" ]; then
+  . "$HOME/.local/share/nvm-sh/nvm.sh"
+  [ -s "$HOME/.local/share/nvm-sh/bash_completion" ] && . "$HOME/.local/share/nvm-sh/bash_completion"
+fi
+
 # Load direnv hook (automatically loads directory-local nix environments)
 if command -v direnv &> /dev/null; then
   eval "$(direnv hook zsh)"
